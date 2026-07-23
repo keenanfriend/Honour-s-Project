@@ -185,7 +185,7 @@ namespace ChartApp
                 for (int i = 0; i < iterations; i++)
                 {
                     mid = (min + max) / 2;
-                    m = (mid - ya) / (j - xa); // gradient of the line
+                    m = (mid - ya) / (j - xa); 
                     double c = mid - m * j;
 
                     (check, _) = CheckCandleHi(m, c, xa, j);
@@ -318,7 +318,22 @@ namespace ChartApp
                         bestResistanceLine = hiCandidate;
                     }
                 }
+            }
 
+            double loStart = 0;
+            double loEnd = end;
+
+            if (bestResistanceLine is not null)
+            {
+                loStart = bestResistanceLine.X1 - 10;
+                loEnd = bestResistanceLine.X1 + 10;
+
+                if (loStart < 0) loStart = 0;
+                if (loEnd > end) loEnd = end;
+            }
+
+            for (int i = (int)loStart; i < (int)loEnd; i++)
+            {
                 TrendLine? loCandidate = ProcessChartDataLo(i, lineLen, end);
                 if (loCandidate is not null)
                 {
@@ -330,6 +345,7 @@ namespace ChartApp
                     }
                 }
             }
+            
         }
 
         public (int, int) CheckCandleHi(double m, double c, int start, int end)

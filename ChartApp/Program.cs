@@ -1,5 +1,6 @@
 ﻿
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -36,13 +37,52 @@ namespace ChartApp
             ReadData();
             FindLines(0, 80);
 
-            if (bestSupportLine is not null)
-                bestSupportLine = ExtendLine(bestSupportLine);
-
             if (bestResistanceLine is not null)
                 bestResistanceLine = ExtendLine(bestResistanceLine);
 
+            // Pin the support line's X1/X2 to the resistance line's endpoints, preserving its gradient
+            if (bestSupportLine is not null && bestResistanceLine is not null)
+            {
+                double m = (bestSupportLine.Y2 - bestSupportLine.Y1) / (bestSupportLine.X2 - bestSupportLine.X1);
+                double c = bestSupportLine.Y1 - m * bestSupportLine.X1;
+                double newX1 = bestResistanceLine.X1;
+                double newX2 = bestResistanceLine.X2;
+                bestSupportLine = new TrendLine(newX1, m * newX1 + c, newX2, m * newX2 + c);
+            }
+
+            if (bestResistanceLine is not null && bestSupportLine is not null)
+            {
+                double pricePerc = (bestResistanceLine.Y1 - bestSupportLine.Y1) / bestSupportLine.Y1 * 100;
+                int result = CalculateResult(pricePerc, bestResistanceLine.X2);
+                Console.WriteLine($"Price %: {pricePerc:F2}%, Result: {(result == 1 ? "TP hit" : result == -1 ? "SL hit" : "No hit")}");
+            }
+
             Display();
+
+
+        }
+
+        public int CalculateResult(double pricePerc, double startIndex)
+        {
+            int start = (int)startIndex;
+            double startPrice = candles[start].High;
+
+            double profit = startPrice * (1 + pricePerc / 100);
+            double loss   = startPrice * (1 - pricePerc / 100);
+
+            for (int i = start + 1; i < candles.Count; i++)
+            {
+                if (candles[i].High >= profit)
+                {
+                    return 1;
+                }
+                else if (candles[i].Low <= loss)
+                {
+                    return -1;
+                }
+            }
+
+            return 0;
         }
 
         public void Display()

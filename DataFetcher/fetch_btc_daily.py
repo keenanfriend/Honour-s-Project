@@ -1,21 +1,20 @@
 """
-fetch_btc_data.py
+fetch_btc_daily.py
 
-Downloads BTCUSDT 1H kline data from the Binance public data repository
-(https://data.binance.vision) and compiles it into a single CSV file that
-matches the btc_data.txt column format used by ChartApp:
+Downloads BTCUSDT 1D (daily) kline data from the Binance public data repository
+(https://data.binance.vision) and compiles it into a single CSV file.
 
     Datetime,Open,High,Low,Close,Volume
 
 Data availability: 2017-08 onwards (we default to 2019-01 → 2025-12).
 
 Output:
-    data/btc_data.csv
+    data/btc_daily.csv
 
 Usage:
-    python3 fetch_btc_data.py                      # 2019-01 → 2025-12
-    python3 fetch_btc_data.py --start 2021-01 --end 2023-12
-    python3 fetch_btc_data.py --out ./mydata/btc_data.csv  # custom output file
+    python3 fetch_btc_daily.py                      # 2019-01 → 2025-12
+    python3 fetch_btc_daily.py --start 2021-01 --end 2023-12
+    python3 fetch_btc_daily.py --out ./mydata/btc_daily.csv
 
 Dependencies:
     pip install requests pandas
@@ -32,9 +31,9 @@ import requests
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-BASE_URL   = "https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/1h"
+BASE_URL   = "https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/1d"
 OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data")
-OUTPUT_FILE = os.path.join(OUTPUT_DIR, "btc_data.csv")
+OUTPUT_FILE = os.path.join(OUTPUT_DIR, "btc_daily.csv")
 
 # Binance kline column names (no header in the CSV)
 KLINE_COLS = [
@@ -61,7 +60,7 @@ def iter_months(start_year: int, start_month: int,
 
 def fetch_month(year: int, month: int):
     """Download one monthly ZIP and return a DataFrame, or None on failure."""
-    filename = f"BTCUSDT-1h-{year}-{month:02d}.zip"
+    filename = f"BTCUSDT-1d-{year}-{month:02d}.zip"
     url      = f"{BASE_URL}/{filename}"
 
     try:
@@ -82,13 +81,12 @@ def fetch_month(year: int, month: int):
 
 
 def normalise_timestamps(df: pd.DataFrame) -> pd.DataFrame:
-    """Convert open_time to a proper Datetime column, handling ms vs us units.
-    Must be called per-month BEFORE concatenation to avoid mixed-unit overflows."""
+    """Convert open_time to a proper Datetime column, handling ms vs us units."""
     sample = df["open_time"].iloc[0]
     unit = "us" if sample > 1e13 else "ms"
 
     df = df.copy()
-    df["Datetime"] = pd.to_datetime(df["open_time"], unit=unit, utc=True).dt.floor("h")
+    df["Datetime"] = pd.to_datetime(df["open_time"], unit=unit, utc=True).dt.floor("D")
     df = df.drop(columns=["open_time", "close_time", "quote_volume",
                            "trades", "taker_buy_base", "taker_buy_quote", "ignore"])
     df = df[["Datetime", "Open", "High", "Low", "Close", "Volume"]]
@@ -101,14 +99,14 @@ def normalise_timestamps(df: pd.DataFrame) -> pd.DataFrame:
 
 def parse_args():
     p = argparse.ArgumentParser(
-        description="Fetch BTCUSDT 1H data from Binance public data repo"
+        description="Fetch BTCUSDT 1D data from Binance public data repo"
     )
     p.add_argument("--start", default="2019-01",
                    help="First month to fetch, YYYY-MM (default: 2019-01)")
     p.add_argument("--end",   default="2025-12",
                    help="Last month to fetch,  YYYY-MM (default: 2025-12)")
     p.add_argument("--out",   default=OUTPUT_FILE,
-                   help="Output CSV file path (default: data/btc_data.csv)")
+                   help="Output CSV file path (default: data/btc_daily.csv)")
     return p.parse_args()
 
 
@@ -119,7 +117,7 @@ if __name__ == "__main__":
     end_year,    end_month    = map(int, args.end.split("-"))
     output_file = args.out
 
-    print(f"Fetching BTCUSDT 1H  {args.start} -> {args.end}")
+    print(f"Fetching BTCUSDT 1D  {args.start} -> {args.end}")
     print(f"Source : {BASE_URL}")
     print(f"Output : {output_file}\n")
 
@@ -136,7 +134,6 @@ if __name__ == "__main__":
             continue
 
         print(f"{len(df)} rows")
-        # Normalise timestamps per-month to avoid mixing ms/us units
         df = normalise_timestamps(df)
         all_frames.append(df)
 
@@ -149,7 +146,7 @@ if __name__ == "__main__":
     combined.sort_values("Datetime", inplace=True)
     combined.drop_duplicates(subset=["Datetime"], inplace=True)
 
-    # Format datetime strings to match btc_data.txt
+    # Format datetime strings
     combined["Datetime"] = combined["Datetime"].dt.strftime("%Y-%m-%d %H:%M:%S+00:00")
 
     # Write to single CSV file

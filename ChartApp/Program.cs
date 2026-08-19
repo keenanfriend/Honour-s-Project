@@ -30,6 +30,9 @@ namespace ChartApp
         double dataHighMax = double.MinValue;
         double dataLowMin = double.MaxValue;
 
+        // SL as a fraction of TP (e.g. 0.5 means SL is half of TP distance)
+        double slRatio = 0.33;
+
         // Daily SMA data: maps date string (yyyy-MM-dd) to SMA50 value
         Dictionary<string, double> dailySma = new();
 
@@ -125,6 +128,7 @@ namespace ChartApp
             int failedEntryBeyondWindow = 0;
             int failedEntryOutOfBounds = 0;
             int noSmaAvailable = 0;
+            int smaRejected = 0;
             int tradeTaken = 0;
 
             while (windowStart + windowSize <= candles.Count)
@@ -210,14 +214,12 @@ namespace ChartApp
                 if (isLong)
                 {
                     patternLength = entryIndex - (int)bestResistanceLine!.X1;
-                    result = CalculateResultLong(pricePerc, entryIndex, patternLength);
-                    resolvedIndex = FindResolutionIndexLong(pricePerc, entryIndex, patternLength);
+                    (result, resolvedIndex) = EvaluateTradeLong(pricePerc, entryIndex, patternLength);
                 }
                 else
                 {
                     patternLength = entryIndex - (int)bestSupportLine!.X1;
-                    result = CalculateResultShort(pricePerc, entryIndex, patternLength);
-                    resolvedIndex = FindResolutionIndexShort(pricePerc, entryIndex, patternLength);
+                    (result, resolvedIndex) = EvaluateTradeShort(pricePerc, entryIndex, patternLength);
                 }
 
                 trades++;
@@ -234,7 +236,7 @@ namespace ChartApp
                 else if (result == -1)
                 {
                     losses++;
-                    balance *= (1 - pricePerc / 100);
+                    balance *= (1 - (pricePerc * slRatio) / 100);
                     if (isLong) longTrades++;
                     else shortTrades++;
                 }
@@ -356,17 +358,16 @@ namespace ChartApp
             }
         }
 
-        /// <summary>
-        /// Extends resistance line forward until price touches or breaches it from below.
-        /// </summary>
         public TrendLine ExtendLineLong(TrendLine line)
         {
             double m = (line.Y2 - line.Y1) / (line.X2 - line.X1);
             double c = line.Y1 - m * line.X1;
 
             int startIndex = (int)line.X2 + 1;
+            int maxExtension = (int)(line.X2 - line.X1) * 2; // cap at 2x pattern length
+            int endIndex = Math.Min(startIndex + maxExtension, candles.Count);
 
-            for (int i = startIndex; i < candles.Count; i++)
+            for (int i = startIndex; i < endIndex; i++)
             {
                 Candle candle = candles[i];
                 double y = m * candle.Index + c;
@@ -378,7 +379,7 @@ namespace ChartApp
                     return new TrendLine(line.X1, line.Y1, candle.Index, y);
             }
 
-            double lastIndex = candles[^1].Index;
+            double lastIndex = (endIndex < candles.Count) ? candles[endIndex - 1].Index : candles[^1].Index;
             return new TrendLine(line.X1, line.Y1, lastIndex, m * lastIndex + c);
         }
 
@@ -494,7 +495,7 @@ namespace ChartApp
                     m = (mid - ya) / (j - xa);
                     double c = mid - m * j;
 
-                    (check, _) = CheckCandleLo(m, c, xa, j);
+                    (check, touchCount) = CheckCandleLo(m, c, xa, j);
 
                     if (check == 1)
                     {
@@ -506,8 +507,6 @@ namespace ChartApp
                         max = mid;
                         continue;
                     }
-
-                    (_, touchCount) = CheckCandleLo(m, mid - m * j, xa, j);
 
                     if (touchCount > 2 && m >= 0) // upward or flat slope, >2 touches
                     {
@@ -554,7 +553,7 @@ namespace ChartApp
                     m = (mid - ya) / (j - xa);
                     double c = mid - m * j;
 
-                    (check, _) = CheckCandleHi(m, c, xa, j);
+                    (check, touchCount) = CheckCandleHi(m, c, xa, j);
 
                     if (check == 1)
                     {
@@ -566,8 +565,6 @@ namespace ChartApp
                     }
                     else
                     {
-                        (_, touchCount) = CheckCandleHi(m, mid - m * j, xa, j);
-
                         if (touchCount > 1)
                         {
                             double abs_m = Math.Abs(m);
@@ -593,8 +590,10 @@ namespace ChartApp
             double c = line.Y1 - m * line.X1;
 
             int startIndex = (int)line.X2 + 1;
+            int maxExtension = (int)(line.X2 - line.X1) * 2; // cap at 2x pattern length
+            int endIndex = Math.Min(startIndex + maxExtension, candles.Count);
 
-            for (int i = startIndex; i < candles.Count; i++)
+            for (int i = startIndex; i < endIndex; i++)
             {
                 Candle candle = candles[i];
                 double y = m * candle.Index + c;
@@ -608,73 +607,42 @@ namespace ChartApp
                     return new TrendLine(line.X1, line.Y1, candle.Index, y);
             }
 
-            double lastIndex = candles[^1].Index;
+            double lastIndex = (endIndex < candles.Count) ? candles[endIndex - 1].Index : candles[^1].Index;
             return new TrendLine(line.X1, line.Y1, lastIndex, m * lastIndex + c);
         }
 
-        // =====================================================================
-        // Trade Result Calculation
-        // =====================================================================
 
-        /// <summary>Long: TP when price rises by pricePerc, SL when it falls by half. No time limit.</summary>
-        public int CalculateResultLong(double pricePerc, int entryIndex, int patternLength)
+        /// <summary>Long: TP when price rises by pricePerc, SL when it falls by pricePerc * slRatio. Returns (result, resolutionIndex).</summary>
+        public (int result, int resolvedIndex) EvaluateTradeLong(double pricePerc, int entryIndex, int patternLength)
         {
             double startPrice = candles[entryIndex].High;
             double profit = startPrice * (1 + pricePerc / 100);
-            double loss   = startPrice * (1 - (pricePerc / 2) / 100);
+            double loss   = startPrice * (1 - (pricePerc * slRatio) / 100);
 
             for (int i = entryIndex + 1; i < candles.Count; i++)
             {
                 if (candles[i].High >= profit)
-                    return 1;
+                    return (1, i);
                 else if (candles[i].Low <= loss)
-                    return -1;
+                    return (-1, i);
             }
-            return 0;
+            return (0, candles.Count - 1);
         }
 
-        public int CalculateResultShort(double pricePerc, int entryIndex, int patternLength)
+        public (int result, int resolvedIndex) EvaluateTradeShort(double pricePerc, int entryIndex, int patternLength)
         {
             double startPrice = candles[entryIndex].Low;
             double profit = startPrice * (1 - pricePerc / 100);
-            double loss   = startPrice * (1 + pricePerc / 100);
+            double loss   = startPrice * (1 + (pricePerc * slRatio) / 100);
 
             for (int i = entryIndex + 1; i < candles.Count; i++)
             {
                 if (candles[i].Low <= profit)
-                    return 1;
+                    return (1, i);
                 else if (candles[i].High >= loss)
-                    return -1;
+                    return (-1, i);
             }
-            return 0;
-        }
-
-        public int FindResolutionIndexLong(double pricePerc, int entryIndex, int patternLength)
-        {
-            double startPrice = candles[entryIndex].High;
-            double profit = startPrice * (1 + pricePerc / 100);
-            double loss   = startPrice * (1 - pricePerc / 100);
-
-            for (int i = entryIndex + 1; i < candles.Count; i++)
-            {
-                if (candles[i].High >= profit || candles[i].Low <= loss)
-                    return i;
-            }
-            return candles.Count - 1;
-        }
-
-        public int FindResolutionIndexShort(double pricePerc, int entryIndex, int patternLength)
-        {
-            double startPrice = candles[entryIndex].Low;
-            double profit = startPrice * (1 - pricePerc / 100);
-            double loss   = startPrice * (1 + (pricePerc / 2) / 100);
-
-            for (int i = entryIndex + 1; i < candles.Count; i++)
-            {
-                if (candles[i].Low <= profit || candles[i].High >= loss)
-                    return i;
-            }
-            return candles.Count - 1;
+            return (0, candles.Count - 1);
         }
 
 
@@ -706,7 +674,7 @@ namespace ChartApp
                     m = (mid - ya) / (j - xa);
                     double c = mid - m * j;
 
-                    (check, _) = CheckCandleHi(m, c, xa, j);
+                    (check, touchCount) = CheckCandleHi(m, c, xa, j);
 
                     if (check == 1)
                     {
@@ -718,8 +686,6 @@ namespace ChartApp
                     }
                     else
                     {
-                        (_, touchCount) = CheckCandleHi(m, mid - m * j, xa, j);
-
                         if (touchCount > 2 && m <= 0)
                         {
                             double abs_m = Math.Abs(m);
@@ -763,7 +729,7 @@ namespace ChartApp
                     m = (mid - ya) / (j - xa);
                     double c = mid - m * j;
 
-                    (check, _) = CheckCandleLo(m, c, xa, j);
+                    (check, touchCount) = CheckCandleLo(m, c, xa, j);
 
                     if (check == 1)
                     {
@@ -775,8 +741,6 @@ namespace ChartApp
                         max = mid;
                         continue;
                     }
-
-                    (_, touchCount) = CheckCandleLo(m, mid - m * j, xa, j);
 
                     if (touchCount > 1)
                     {
@@ -792,10 +756,6 @@ namespace ChartApp
 
             return bestfit;
         }
-
-        // =====================================================================
-        // Candle Check Methods (shared by long and short)
-        // =====================================================================
 
         public (int, int) CheckCandleHi(double m, double c, int start, int end)
         {

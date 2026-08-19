@@ -1,4 +1,4 @@
-    class Candle
+    public class Candle
     {
         public int Index { get; set; }
         public string Date { get; set; }

@@ -1,28 +1,28 @@
-class Chromosome
+namespace ChartApp
 {
-    private double windowSize;
-    private double windowShift;
-    private double minLineLength;
-    private double vicinity;
-    private double slRatio;
-    private double sma;
-    private double tradeLength;
-    private double maxProfitPerc;
-    private double minTouchCount;
+    public class Chromosome
+    {
+        public int WindowSize { get; }
+        public int WindowShift { get; }
+        public int MinLineLength { get; }
+        public int Vicinity { get; }
+        public double SlRatio { get; }
+        public int SmaPeriod { get; }
+        public int MaxTradeLength { get; }
+        public double MaxProfitPerc { get; }
 
-    public Chromosome(double windowSize, double windowShift, double minLineLength, 
-                      double vicinity, double slRatio, double sma, double tradeLength, double maxProfitPerc, double minTouchCount) {
-        
-        this.windowSize = windowSize;
-        this.windowShift = windowShift;
-        this.minLineLength = minLineLength;
-        this.vicinity = vicinity;
-        this.slRatio = slRatio;
-        this.sma = sma;
-        this.tradeLength = tradeLength;
-        this.maxProfitPerc = maxProfitPerc;
-        this.minTouchCount = minTouchCount;
+        public Chromosome(int windowSize, int windowShift, int minLineLength,
+                          int vicinity, double slRatio, int smaPeriod,
+                          int maxTradeLength, double maxProfitPerc)
+        {
+            WindowSize = windowSize;
+            WindowShift = windowShift;
+            MinLineLength = minLineLength;
+            Vicinity = vicinity;
+            SlRatio = slRatio;
+            SmaPeriod = smaPeriod;
+            MaxTradeLength = maxTradeLength;
+            MaxProfitPerc = maxProfitPerc;
+        }
     }
-
-
 }

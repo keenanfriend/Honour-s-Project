@@ -1,0 +1,19 @@
+=== GA Evaluation Pass ===
+Pass Number:       855
+Timestamp:         2026-08-25 14:08:05
+
+--- GA Parameters ---
+WindowSize:        272
+WindowShift:       7
+MinLineLength:     63
+SmaPeriod:         48
+MaxGradientDiff:   45.974225
+
+--- Constants ---
+Vicinity:          20
+MinTouchCount:     2
+
+--- Results ---
+Fitness (Return%): 0.0000
+Patterns Found:    0
+Total Return %:    0.0000

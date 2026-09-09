@@ -1,0 +1,19 @@
+=== GA Evaluation Pass ===
+Pass Number:       777
+Timestamp:         2026-08-25 13:58:08
+
+--- GA Parameters ---
+WindowSize:        274
+WindowShift:       7
+MinLineLength:     40
+SmaPeriod:         140
+MaxGradientDiff:   47.278923
+
+--- Constants ---
+Vicinity:          20
+MinTouchCount:     2
+
+--- Results ---
+Fitness (Return%): 3919.2226
+Patterns Found:    501
+Total Return %:    3919.2226

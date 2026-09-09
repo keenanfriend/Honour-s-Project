@@ -1,0 +1,27 @@
+=== GA Evaluation Pass ===
+Pass Number:       9
+Timestamp:         2026-08-25 13:20:16
+
+--- GA Parameters ---
+WindowSize:        195
+WindowShift:       38
+MinLineLength:     39
+SmaPeriod:         50
+MaxGradientDiff:   27.906061
+
+--- Constants ---
+Vicinity:          20
+SlRatio:           0.50
+MaxTradeLength:    500
+MaxProfitPerc:     10.00
+MinTouchCount:     2
+
+--- Results ---
+Fitness:           748.9455
+Trades:            3
+Wins:              1
+Losses:            2
+No Result:         0
+Win Rate:          33.33%
+Final Balance:     96.7096
+Max Drawdown:      4.30%

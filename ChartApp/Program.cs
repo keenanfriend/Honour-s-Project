@@ -17,24 +17,41 @@ namespace ChartApp
             Dictionary<string, double> dailySma = LoadDailySma();
             Console.WriteLine($"Loaded {dailySma.Count} daily SMA values.");
 
-            // Create evaluator (use first 5000 candles for quick testing)
+            // Create evaluator factory (each thread gets its own instance for thread safety)
             var testCandles = candles.GetRange(0, Math.Min(5000, candles.Count));
-            var evaluator = new FitnessEval(testCandles, dailySma);
+            Func<FitnessEval> evaluatorFactory = () => new FitnessEval(testCandles, dailySma);
 
-            // Test with a default chromosome
-            var chromosome = new Chromosome(
-                windowSize: 168,
-                windowShift: 6,
-                minLineLength: 80,
-                vicinity: 20,
-                slRatio: 0.5,
-                smaPeriod: 50,
-                maxTradeLength: 500,
-                maxProfitPerc: 10.0
-            );
+            // Run genetic algorithm
+            var ga = new GeneticAlgorithm(evaluatorFactory)
+            {
+                PopulationSize = 50,
+                Generations = 100,
+                TournamentSize = 3,
+                CrossoverRate = 0.80,
+                MutationRate = 0.15,
+                MaxParallelism = 10
+            };
 
-            double fitness = evaluator.Evaluate(chromosome);
-            Console.WriteLine($"Fitness: {fitness:F4}");
+            Console.WriteLine("Starting GA...");
+            Console.WriteLine($"Population: {ga.PopulationSize} | Generations: {ga.Generations}");
+            Console.WriteLine();
+
+            var (best, bestResult) = ga.Run();
+
+            Console.WriteLine();
+            Console.WriteLine("=== GA Complete ===");
+            Console.WriteLine($"Best Fitness:      {bestResult.Fitness:F4}%");
+            Console.WriteLine($"Patterns Found:    {bestResult.PatternsFound}");
+            Console.WriteLine($"Total Return %:    {bestResult.TotalReturnPerc:F4}");
+            Console.WriteLine();
+            Console.WriteLine("--- Best Parameters ---");
+            Console.WriteLine($"WindowSize:        {best.WindowSize}");
+            Console.WriteLine($"WindowShift:       {best.WindowShift}");
+            Console.WriteLine($"MinLineLength:     {best.MinLineLength}");
+            Console.WriteLine($"SmaPeriod:         {best.SmaPeriod}");
+            Console.WriteLine($"MaxGradientDiff:   {best.MaxGradientDiff:F6}");
+            Console.WriteLine();
+            Console.WriteLine("Results written to /results/ folder.");
         }
 
         private static List<Candle> LoadCandles()

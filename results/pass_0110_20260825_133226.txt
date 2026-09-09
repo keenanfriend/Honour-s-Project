@@ -1,0 +1,19 @@
+=== GA Evaluation Pass ===
+Pass Number:       110
+Timestamp:         2026-08-25 13:32:26
+
+--- GA Parameters ---
+WindowSize:        456
+WindowShift:       30
+MinLineLength:     39
+SmaPeriod:         84
+MaxGradientDiff:   45.922019
+
+--- Constants ---
+Vicinity:          20
+MinTouchCount:     2
+
+--- Results ---
+Fitness (Return%): 1006.1754
+Patterns Found:    113
+Total Return %:    1006.1754

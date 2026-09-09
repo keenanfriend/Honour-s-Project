@@ -24,7 +24,7 @@ namespace ChartApp
             this.dailySma = dailySma;
         }
 
-        public double Evaluate(Chromosome c)
+        public EvalResult Evaluate(Chromosome c)
         {
             return RunSlidingWindow(c);
         }
@@ -52,24 +52,17 @@ namespace ChartApp
         // Sliding Window
         // =====================================================================
 
-        private double RunSlidingWindow(Chromosome c)
+        private EvalResult RunSlidingWindow(Chromosome c)
         {
             int windowSize = c.WindowSize;
             int lineLen = c.MinLineLength;
             int windowShift = c.WindowShift;
-            double slRatio = c.SlRatio;
-            double maxProfitPerc = c.MaxProfitPerc;
-            int vicinity = c.Vicinity;
-            int maxTradeLength = c.MaxTradeLength;
+            double maxGradientDiff = c.MaxGradientDiff;
+            int vicinity = Chromosome.Vicinity;
             int windowStart = 0;
 
-            int trades = 0;
-            int wins = 0;
-            int losses = 0;
-            int noResult = 0;
-            double balance = 100.0;
-            double peak = balance;
-            double maxDrawdown = 0;
+            int patternsFound = 0;
+            double totalReturnPerc = 0;
 
             while (windowStart + windowSize <= candles.Count)
             {
@@ -115,11 +108,11 @@ namespace ChartApp
 
                 if (isLong)
                 {
-                    patternFound = FindLongPattern(windowStart, lineLen, windowEnd, vicinity, out pricePerc, out entryIndex);
+                    patternFound = FindLongPattern(windowStart, lineLen, windowEnd, vicinity, maxGradientDiff, out pricePerc, out entryIndex);
                 }
                 else
                 {
-                    patternFound = FindShortPattern(windowStart, lineLen, windowEnd, vicinity, out pricePerc, out entryIndex);
+                    patternFound = FindShortPattern(windowStart, lineLen, windowEnd, vicinity, maxGradientDiff, out pricePerc, out entryIndex);
                 }
 
                 if (!patternFound)
@@ -128,76 +121,24 @@ namespace ChartApp
                     continue;
                 }
 
-                if (pricePerc > maxProfitPerc)
-                    pricePerc = maxProfitPerc;
+                // Accumulate rate of return
+                patternsFound++;
+                totalReturnPerc += pricePerc;
 
-                if (entryIndex < windowEnd - 1)
-                {
-                    windowStart += windowShift;
-                    continue;
-                }
-
-                if (entryIndex >= candles.Count)
-                {
-                    windowStart += windowShift;
-                    continue;
-                }
-
-                // Evaluate trade
-                int result;
-                int resolvedIndex;
-                int patternLength;
-
-                if (isLong)
-                {
-                    patternLength = entryIndex - (int)bestResistanceLine!.X1;
-                    (result, resolvedIndex) = EvaluateTradeLong(pricePerc, entryIndex, patternLength, slRatio, maxTradeLength);
-                }
-                else
-                {
-                    patternLength = entryIndex - (int)bestSupportLine!.X1;
-                    (result, resolvedIndex) = EvaluateTradeShort(pricePerc, entryIndex, patternLength, slRatio, maxTradeLength);
-                }
-
-                trades++;
-
-                if (result == 1)
-                {
-                    wins++;
-                    balance *= (1 + pricePerc / 100);
-                }
-                else if (result == -1)
-                {
-                    losses++;
-                    balance *= (1 - (pricePerc * slRatio) / 100);
-                }
-                else
-                {
-                    noResult++;
-                }
-
-                // Track drawdown
-                if (balance > peak) peak = balance;
-                double drawdown = (peak - balance) / peak;
-                if (drawdown > maxDrawdown) maxDrawdown = drawdown;
-
-                windowStart = resolvedIndex + 1;
+                windowStart += windowShift;
             }
 
-            // Compute fitness
-            if (trades == 0) return 0;
+            // Fitness = total rate of return percentage
+            double fitness = totalReturnPerc;
 
-            double winRate = (double)wins / trades;
-            double drawdownPenalty = (maxDrawdown > 0) ? (1.0 / maxDrawdown) : 100.0;
-
-            return balance * drawdownPenalty * winRate;
+            return new EvalResult(fitness, patternsFound, totalReturnPerc);
         }
 
         // =====================================================================
         // LONG Pattern Finding
         // =====================================================================
 
-        private bool FindLongPattern(int windowStart, int lineLen, int windowEnd, int vicinity, out double pricePerc, out int entryIndex)
+        private bool FindLongPattern(int windowStart, int lineLen, int windowEnd, int vicinity, double maxGradientDiff, out double pricePerc, out int entryIndex)
         {
             pricePerc = 0;
             entryIndex = 0;
@@ -222,6 +163,11 @@ namespace ChartApp
             double supportGrad = (bestSupportLine.Y2 - bestSupportLine.Y1) / (bestSupportLine.X2 - bestSupportLine.X1);
 
             if (resistanceGrad > supportGrad)
+                return false;
+
+            // Gradient difference filter: reject if lines diverge more than allowed
+            double gradientDiff = Math.Abs(resistanceGrad - supportGrad);
+            if (gradientDiff > maxGradientDiff)
                 return false;
 
             pricePerc = (bestResistanceLine.Y1 - bestSupportLine.Y1) / bestSupportLine.Y1 * 100;
@@ -296,7 +242,7 @@ namespace ChartApp
         // SHORT Pattern Finding
         // =====================================================================
 
-        private bool FindShortPattern(int windowStart, int lineLen, int windowEnd, int vicinity, out double pricePerc, out int entryIndex)
+        private bool FindShortPattern(int windowStart, int lineLen, int windowEnd, int vicinity, double maxGradientDiff, out double pricePerc, out int entryIndex)
         {
             pricePerc = 0;
             entryIndex = 0;
@@ -321,6 +267,11 @@ namespace ChartApp
             double resistanceGrad = (bestResistanceLine.Y2 - bestResistanceLine.Y1) / (bestResistanceLine.X2 - bestResistanceLine.X1);
 
             if (supportGrad < resistanceGrad)
+                return false;
+
+            // Gradient difference filter: reject if lines diverge more than allowed
+            double gradientDiff = Math.Abs(supportGrad - resistanceGrad);
+            if (gradientDiff > maxGradientDiff)
                 return false;
 
             pricePerc = (bestResistanceLine.Y1 - bestSupportLine.Y1) / bestSupportLine.Y1 * 100;
@@ -371,49 +322,68 @@ namespace ChartApp
             int xa = start;
             int xb = start + lineLen;
             double ya = candles[start].Low;
-            double m = 0;
-            int touchCount;
             double least_m = double.MinValue;
 
             TrendLine? bestfit = null;
 
             for (int j = xb; j < end; j++)
             {
-                touchCount = 0;
-                double max = dataHighMax;
-                double min = dataLowMin;
-                double mid = 0;
-                m = 1;
-                int check = 1;
-                int iterations = 20;
+                // The steepest positive gradient possible for this endpoint
+                // is constrained by the highest point reachable at j.
+                // If that max gradient's abs can't beat our current best (we want largest), skip.
+                double maxGradient = (dataHighMax - ya) / (j - xa);
+                if (Math.Abs(maxGradient) <= least_m)
+                    continue;
 
-                for (int i = 0; i < iterations; i++)
+                // Find the constraining gradient: the line must sit below all BodyLo values.
+                // The "highest" valid support line is the one constrained by the lowest BodyLo,
+                // which forces the most negative (or least positive) gradient.
+                double bestGradientForJ = double.PositiveInfinity;
+                for (int i = xa + 1; i < j; i++)
                 {
-                    mid = (min + max) / 2;
-                    m = (mid - ya) / (j - xa);
-                    double c = mid - m * j;
+                    double requiredM = (candles[i].BodyLo - ya) / (i - xa);
+                    if (requiredM < bestGradientForJ)
+                        bestGradientForJ = requiredM;
+                }
 
-                    (check, touchCount) = CheckCandleLo(m, c, xa, j);
+                double m = bestGradientForJ;
+                if (m == double.PositiveInfinity)
+                    continue;
 
-                    if (check == 1)
+                // We want m >= 0 (support slopes up or flat for short pattern)
+                if (m < 0)
+                    continue;
+
+                double c = ya - m * xa;
+                double yEnd = m * j + c;
+
+                // Validate: count touches (wick touches between Low and BodyLo)
+                int touchCount = 0;
+                bool valid = true;
+                for (int i = xa; i < j; i++)
+                {
+                    Candle candle = candles[i];
+                    double y = m * candle.Index + c;
+
+                    if (y > candle.BodyLo)
                     {
-                        min = mid;
-                        continue;
+                        valid = false;
+                        break;
                     }
-                    if (check == -1)
-                    {
-                        max = mid;
-                        continue;
-                    }
+                    if (y <= candle.BodyLo && y >= candle.Low)
+                        touchCount++;
+                }
 
-                    if (touchCount > MinTouchCount && m >= 0)
+                if (!valid)
+                    continue;
+
+                if (touchCount > MinTouchCount)
+                {
+                    double abs_m = Math.Abs(m);
+                    if (abs_m > least_m)
                     {
-                        double abs_m = Math.Abs(m);
-                        if (abs_m > least_m)
-                        {
-                            least_m = abs_m;
-                            bestfit = new TrendLine(xa, ya, j, mid);
-                        }
+                        least_m = abs_m;
+                        bestfit = new TrendLine(xa, ya, j, yEnd);
                     }
                 }
             }
@@ -426,49 +396,61 @@ namespace ChartApp
             int xa = start;
             int xb = start + lineLen;
             double ya = candles[start].High;
-            double m = 0;
-            int touchCount;
             double least_m = double.MaxValue;
 
             TrendLine? bestfit = null;
 
             for (int j = xb; j < end; j++)
             {
-                touchCount = 0;
-                double max = dataHighMax;
-                double min = dataLowMin;
-                double mid = 0;
-                m = 1;
-                int check = 1;
-                int iterations = 20;
-
-                for (int i = 0; i < iterations; i++)
+                // Find the constraining gradient: the line must sit above all BodyHi values.
+                // The "lowest" valid resistance is constrained by the highest BodyHi,
+                // which forces the least negative (or most positive) gradient.
+                double bestGradientForJ = double.NegativeInfinity;
+                for (int i = xa + 1; i < j; i++)
                 {
-                    mid = (min + max) / 2;
-                    m = (mid - ya) / (j - xa);
-                    double c = mid - m * j;
+                    double requiredM = (candles[i].BodyHi - ya) / (i - xa);
+                    if (requiredM > bestGradientForJ)
+                        bestGradientForJ = requiredM;
+                }
 
-                    (check, touchCount) = CheckCandleHi(m, c, xa, j);
+                double m = bestGradientForJ;
+                if (m == double.NegativeInfinity)
+                    continue;
 
-                    if (check == 1)
+                // Early skip: if this gradient's abs is already worse than our best, skip
+                double abs_m = Math.Abs(m);
+                if (abs_m >= least_m)
+                    continue;
+
+                double c = ya - m * xa;
+                double yEnd = m * j + c;
+
+                // Validate: count touches (wick touches between BodyHi and High)
+                int touchCount = 0;
+                bool valid = true;
+                for (int i = xa; i < j; i++)
+                {
+                    Candle candle = candles[i];
+                    double y = m * candle.Index + c;
+
+                    if (y < candle.BodyHi)
                     {
-                        max = mid;
+                        valid = false;
+                        break;
                     }
-                    else if (check == -1)
+                    if (y >= candle.BodyHi && y <= candle.High)
+                        touchCount++;
+                }
+
+                if (!valid)
+                    continue;
+
+                if (touchCount > 1)
+                {
+                    if (abs_m < least_m)
                     {
-                        min = mid;
-                    }
-                    else
-                    {
-                        if (touchCount > 1)
-                        {
-                            double abs_m = Math.Abs(m);
-                            if (abs_m < least_m)
-                            {
-                                least_m = abs_m;
-                                bestfit = new TrendLine(xa, ya, j, mid);
-                            }
-                        }
+                        least_m = abs_m;
+                        bestfit = new TrendLine(xa, ya, j, yEnd);
                     }
                 }
             }
@@ -550,49 +532,66 @@ namespace ChartApp
             int xa = start;
             int xb = start + lineLen;
             double ya = candles[start].High;
-            double m = 0;
-            int touchCount;
             double least_m = double.MinValue;
 
             TrendLine? bestfit = null;
 
             for (int j = xb; j < end; j++)
             {
-                touchCount = 0;
-                double max = dataHighMax;
-                double min = dataLowMin;
-                double mid = 0;
-                m = 1;
-                int check = 1;
-                int iterations = 20;
+                // The lowest (most negative) gradient possible for this endpoint
+                // is constrained by the highest BodyHi between xa and j.
+                // If that minimum gradient's abs can't beat our current best, skip.
+                double minGradient = (dataLowMin - ya) / (j - xa);
+                if (Math.Abs(minGradient) <= least_m)
+                    continue;
 
-                for (int i = 0; i < iterations; i++)
+                // Find the constraining gradient: the line must sit above all BodyHi values.
+                // The "lowest" valid line is determined by the candle that forces the
+                // steepest (least negative) gradient.
+                double bestGradientForJ = double.NegativeInfinity;
+                for (int i = xa + 1; i < j; i++)
                 {
-                    mid = (min + max) / 2;
-                    m = (mid - ya) / (j - xa);
-                    double c = mid - m * j;
+                    // Gradient required to just touch candle i's BodyHi from anchor (xa, ya)
+                    double requiredM = (candles[i].BodyHi - ya) / (i - xa);
+                    if (requiredM > bestGradientForJ)
+                        bestGradientForJ = requiredM;
+                }
 
-                    (check, touchCount) = CheckCandleHi(m, c, xa, j);
+                // We want m <= 0 (resistance slopes down or flat)
+                double m = bestGradientForJ;
+                if (m > 0)
+                    continue;
 
-                    if (check == 1)
+                double c = ya - m * xa;
+                double yEnd = m * j + c;
+
+                // Validate: count touches (wick touches between BodyHi and High)
+                int touchCount = 0;
+                bool valid = true;
+                for (int i = xa; i < j; i++)
+                {
+                    Candle candle = candles[i];
+                    double y = m * candle.Index + c;
+
+                    if (y < candle.BodyHi)
                     {
-                        max = mid;
+                        valid = false;
+                        break;
                     }
-                    else if (check == -1)
+                    if (y >= candle.BodyHi && y <= candle.High)
+                        touchCount++;
+                }
+
+                if (!valid)
+                    continue;
+
+                if (touchCount > MinTouchCount)
+                {
+                    double abs_m = Math.Abs(m);
+                    if (abs_m > least_m)
                     {
-                        min = mid;
-                    }
-                    else
-                    {
-                        if (touchCount > MinTouchCount && m <= 0)
-                        {
-                            double abs_m = Math.Abs(m);
-                            if (abs_m > least_m)
-                            {
-                                least_m = abs_m;
-                                bestfit = new TrendLine(xa, ya, j, mid);
-                            }
-                        }
+                        least_m = abs_m;
+                        bestfit = new TrendLine(xa, ya, j, yEnd);
                     }
                 }
             }
@@ -605,49 +604,62 @@ namespace ChartApp
             int xa = start;
             int xb = start + lineLen;
             double ya = candles[start].Low;
-            double m = 0;
-            int touchCount;
             double least_m = double.MaxValue;
 
             TrendLine? bestfit = null;
 
             for (int j = xb; j < end; j++)
             {
-                touchCount = 0;
-                double max = dataHighMax;
-                double min = dataLowMin;
-                double mid = 0;
-                m = 1;
-                int check = 1;
-                int iterations = 20;
-
-                for (int i = 0; i < iterations; i++)
+                // Find the constraining gradient: the line must sit below all BodyLo values.
+                // The "highest" valid line is determined by the candle that forces the
+                // least positive (most negative) gradient — i.e. the lowest BodyLo pulls the line down.
+                double bestGradientForJ = double.PositiveInfinity;
+                for (int i = xa + 1; i < j; i++)
                 {
-                    mid = (min + max) / 2;
-                    m = (mid - ya) / (j - xa);
-                    double c = mid - m * j;
+                    // Gradient required so line just touches candle i's BodyLo from anchor (xa, ya)
+                    double requiredM = (candles[i].BodyLo - ya) / (i - xa);
+                    if (requiredM < bestGradientForJ)
+                        bestGradientForJ = requiredM;
+                }
 
-                    (check, touchCount) = CheckCandleLo(m, c, xa, j);
+                double m = bestGradientForJ;
+                if (m == double.PositiveInfinity)
+                    continue;
 
-                    if (check == 1)
+                // Early skip: if this gradient's abs is already worse than our best, skip
+                double abs_m = Math.Abs(m);
+                if (abs_m >= least_m)
+                    continue;
+
+                double c = ya - m * xa;
+                double yEnd = m * j + c;
+
+                // Validate: count touches (wick touches between Low and BodyLo)
+                int touchCount = 0;
+                bool valid = true;
+                for (int i = xa; i < j; i++)
+                {
+                    Candle candle = candles[i];
+                    double y = m * candle.Index + c;
+
+                    if (y > candle.BodyLo)
                     {
-                        min = mid;
-                        continue;
+                        valid = false;
+                        break;
                     }
-                    if (check == -1)
-                    {
-                        max = mid;
-                        continue;
-                    }
+                    if (y <= candle.BodyLo && y >= candle.Low)
+                        touchCount++;
+                }
 
-                    if (touchCount > 1)
+                if (!valid)
+                    continue;
+
+                if (touchCount > 1)
+                {
+                    if (abs_m < least_m)
                     {
-                        double abs_m = Math.Abs(m);
-                        if (abs_m < least_m)
-                        {
-                            least_m = abs_m;
-                            bestfit = new TrendLine(xa, ya, j, mid);
-                        }
+                        least_m = abs_m;
+                        bestfit = new TrendLine(xa, ya, j, yEnd);
                     }
                 }
             }

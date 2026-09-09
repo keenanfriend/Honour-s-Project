@@ -1,0 +1,19 @@
+=== GA Evaluation Pass ===
+Pass Number:       603
+Timestamp:         2026-08-25 13:50:46
+
+--- GA Parameters ---
+WindowSize:        274
+WindowShift:       7
+MinLineLength:     44
+SmaPeriod:         51
+MaxGradientDiff:   44.091438
+
+--- Constants ---
+Vicinity:          20
+MinTouchCount:     2
+
+--- Results ---
+Fitness (Return%): 0.0000
+Patterns Found:    0
+Total Return %:    0.0000

@@ -17,21 +17,32 @@ namespace ChartApp
         public double CrossoverRate { get; set; } = 0.5; // per-gene swap probability
         public double MutationRate { get; set; } = 0.15; // probability of mutating each gene
         public int MaxParallelism { get; set; } = 10;
+        public int ElitismCount { get; set; } = 2; // top individuals carried forward unchanged each generation
 
         // Gene bounds: [min, max] for each GA parameter
-        // Order: WindowSize, WindowShift, MinLineLength, SmaPeriod, MaxGradientDiff
+        // Order: WindowSize, WindowShift, MinLineLength, SmaPeriod, MinGradientDiff
+        // MinGradientDiff replaces the old MaxGradientDiff ceiling as of
+        // D-0026: E-0008/E-0009 found evolving an upper bound on how much the
+        // support/resistance gradients may differ was actively harmful (best
+        // fitness rose when the cap was removed, and the best trade in
+        // E-0009's sample needed a bigger difference than the gene's own
+        // ceiling allowed). This gene now evolves a *minimum* required
+        // difference instead -- rejecting near-parallel, weak-wedge patterns
+        // -- reusing the same bounds/sigma infrastructure the ceiling used.
+        // The "must not diverge" directional check in FitnessEval is separate
+        // and untouched by this change.
         private readonly (int min, int max) windowSizeBounds = (100, 500);
         private readonly (int min, int max) windowShiftBounds = (1, 50);
         private readonly (int min, int max) minLineLengthBounds = (10, 200);
         private readonly (int min, int max) smaPeriodBounds = (5, 200);
-        private readonly (double min, double max) maxGradientDiffBounds = (0.1, 50.0);
+        private readonly (double min, double max) minGradientDiffBounds = (0.1, 50.0);
 
         // Gaussian mutation standard deviations (per gene)
         private readonly double windowSizeSigma = 10.0;
         private readonly double windowShiftSigma = 5.0;
         private readonly double minLineLengthSigma = 10.0;
         private readonly double smaPeriodSigma = 15.0;
-        private readonly double maxGradientDiffSigma = 3.0;
+        private readonly double minGradientDiffSigma = 3.0;
 
         public GeneticAlgorithm(Func<FitnessEval> evaluatorFactory, int? seed = null)
         {
@@ -74,7 +85,7 @@ namespace ChartApp
 
                 var diversity = CalculateDiversity(population);
 
-                Console.WriteLine($"Gen {gen + 1}/{Generations} | Best Fitness: {bestResult.Fitness:F4}% | Patterns: {bestResult.PatternsFound} | WS: {bestChromosome.WindowSize} MLL: {bestChromosome.MinLineLength} MGD: {bestChromosome.MaxGradientDiff:F2} | Stagnant: {stagnantGenerations} | Population Diversity: {diversity}");
+                Console.WriteLine($"Gen {gen + 1}/{Generations} | Best Fitness: {bestResult.Fitness:F4}% | Patterns: {bestResult.PatternsFound} | WS: {bestChromosome.WindowSize} MLL: {bestChromosome.MinLineLength} MinGD: {bestChromosome.MinGradientDiff:F2} | Stagnant: {stagnantGenerations} | Population Diversity: {diversity}");
 
                 // Early stopping
                 if (stagnantGenerations >= EarlyStopGenerations)
@@ -90,11 +101,27 @@ namespace ChartApp
                     ResultLogger.Log(population[i], results[i], passNumber);
                 }
 
-                // Build next generation
-                var nextGen = new List<Chromosome>();
+                // Elitism: carry the top ElitismCount individuals forward
+                // unchanged, so the best solutions found cannot be lost between
+                // generations. Chromosome is immutable, so reusing the same
+                // instances is safe. Their fitness is already known -- no need
+                // to re-evaluate them.
+                var eliteIndices = Enumerable.Range(0, population.Count)
+                    .OrderByDescending(i => results[i].Fitness)
+                    .Take(ElitismCount)
+                    .ToList();
 
-                // Fill via tournament selection + crossover + mutation
-                while (nextGen.Count < PopulationSize)
+                var nextGen = new List<Chromosome>();
+                var eliteResults = new List<EvalResult>();
+                foreach (int idx in eliteIndices)
+                {
+                    nextGen.Add(population[idx]);
+                    eliteResults.Add(results[idx]);
+                }
+
+                // Fill the remaining slots via tournament selection + crossover + mutation
+                var offspring = new List<Chromosome>();
+                while (nextGen.Count + offspring.Count < PopulationSize)
                 {
                     Chromosome parent1 = TournamentSelect(population, results);
                     Chromosome parent2 = TournamentSelect(population, results);
@@ -102,11 +129,13 @@ namespace ChartApp
                     Chromosome child = UniformCrossover(parent1, parent2);
                     child = GaussianMutate(child);
 
-                    nextGen.Add(child);
+                    offspring.Add(child);
                 }
 
-                population = nextGen;
-                results = EvaluatePopulation(population, gen + 1);
+                var offspringResults = EvaluatePopulation(offspring, gen + 1);
+
+                population = nextGen.Concat(offspring).ToList();
+                results = eliteResults.Concat(offspringResults).ToList();
             }
 
             // Final check
@@ -133,33 +162,34 @@ namespace ChartApp
             double meanWindowShift = population.Average(c => c.WindowShift);
             double meanMinLineLength = population.Average(c => c.MinLineLength);
             double meanSmaPeriod = population.Average(c => c.SmaPeriod);
-            double meanMaxGradientDiff = population.Average(c => c.MaxGradientDiff);
+            double meanMinGradientDiff = population.Average(c => c.MinGradientDiff);
 
             // Calculate variance for each gene
             double varianceWindowSize = population.Average(c => Math.Pow(c.WindowSize - meanWindowSize, 2));
             double varianceWindowShift = population.Average(c => Math.Pow(c.WindowShift - meanWindowShift, 2));
             double varianceMinLineLength = population.Average(c => Math.Pow(c.MinLineLength - meanMinLineLength, 2));
             double varianceSmaPeriod = population.Average(c => Math.Pow(c.SmaPeriod - meanSmaPeriod, 2));
-            double varianceMaxGradientDiff = population.Average(c => Math.Pow(c.MaxGradientDiff - meanMaxGradientDiff, 2));
+            double varianceMinGradientDiff = population.Average(c => Math.Pow(c.MinGradientDiff - meanMinGradientDiff, 2));
 
             // Standard deviation
             double stdWindowSize = Math.Sqrt(varianceWindowSize);
             double stdWindowShift = Math.Sqrt(varianceWindowShift);
             double stdMinLineLength = Math.Sqrt(varianceMinLineLength);
             double stdSmaPeriod = Math.Sqrt(varianceSmaPeriod);
-            double stdMaxGradientDiff = Math.Sqrt(varianceMaxGradientDiff);
+            double stdMinGradientDiff = Math.Sqrt(varianceMinGradientDiff);
 
             // Normalise standard deviations to [0, 1] range using gene bounds
             double normStdWindowSize = stdWindowSize / (windowSizeBounds.max - windowSizeBounds.min);
             double normStdWindowShift = stdWindowShift / (windowShiftBounds.max - windowShiftBounds.min);
             double normStdMinLineLength = stdMinLineLength / (minLineLengthBounds.max - minLineLengthBounds.min);
             double normStdSmaPeriod = stdSmaPeriod / (smaPeriodBounds.max - smaPeriodBounds.min);
-            double normStdMaxGradientDiff = stdMaxGradientDiff / (maxGradientDiffBounds.max - maxGradientDiffBounds.min);
+            double normStdMinGradientDiff = stdMinGradientDiff / (minGradientDiffBounds.max - minGradientDiffBounds.min);
 
-            // Average normalised standard deviation as diversity measure
+            // Average normalised standard deviation as diversity measure, over
+            // all five genes -- MinGradientDiff evolves like the other four
+            // now that D-0026 removed the fixed-value ablation machinery.
             double diversity = (normStdWindowSize + normStdWindowShift + normStdMinLineLength +
-                                normStdSmaPeriod + normStdMaxGradientDiff) / 5.0;
-
+                                normStdSmaPeriod + normStdMinGradientDiff) / 5.0;
 
             return diversity;
 
@@ -177,9 +207,9 @@ namespace ChartApp
                 int wsh = rng.Next(windowShiftBounds.min, windowShiftBounds.max + 1);
                 int mll = rng.Next(minLineLengthBounds.min, minLineLengthBounds.max + 1);
                 int sma = rng.Next(smaPeriodBounds.min, smaPeriodBounds.max + 1);
-                double mgd = maxGradientDiffBounds.min + rng.NextDouble() * (maxGradientDiffBounds.max - maxGradientDiffBounds.min);
+                double mingd = minGradientDiffBounds.min + rng.NextDouble() * (minGradientDiffBounds.max - minGradientDiffBounds.min);
 
-                pop.Add(new Chromosome(ws, wsh, mll, sma, mgd));
+                pop.Add(new Chromosome(ws, wsh, mll, sma, mingd));
             }
             return pop;
         }
@@ -253,7 +283,7 @@ namespace ChartApp
         }
 
         // =================================================================
-        // Uniform Crossover (80% swap probability per gene)
+        // Uniform Crossover (per-gene swap probability = CrossoverRate)
         // =================================================================
 
         private Chromosome UniformCrossover(Chromosome p1, Chromosome p2)
@@ -262,9 +292,9 @@ namespace ChartApp
             int wsh = rng.NextDouble() < CrossoverRate ? p2.WindowShift : p1.WindowShift;
             int mll = rng.NextDouble() < CrossoverRate ? p2.MinLineLength : p1.MinLineLength;
             int sma = rng.NextDouble() < CrossoverRate ? p2.SmaPeriod : p1.SmaPeriod;
-            double mgd = rng.NextDouble() < CrossoverRate ? p2.MaxGradientDiff : p1.MaxGradientDiff;
+            double mingd = rng.NextDouble() < CrossoverRate ? p2.MinGradientDiff : p1.MinGradientDiff;
 
-            return new Chromosome(ws, wsh, mll, sma, mgd);
+            return new Chromosome(ws, wsh, mll, sma, mingd);
         }
 
         // =================================================================
@@ -277,7 +307,7 @@ namespace ChartApp
             int wsh = c.WindowShift;
             int mll = c.MinLineLength;
             int sma = c.SmaPeriod;
-            double mgd = c.MaxGradientDiff;
+            double mingd = c.MinGradientDiff;
 
             if (rng.NextDouble() < MutationRate)
                 ws = Clamp((int)(ws + GaussianSample() * windowSizeSigma), windowSizeBounds.min, windowSizeBounds.max);
@@ -292,9 +322,9 @@ namespace ChartApp
                 sma = Clamp((int)(sma + GaussianSample() * smaPeriodSigma), smaPeriodBounds.min, smaPeriodBounds.max);
 
             if (rng.NextDouble() < MutationRate)
-                mgd = ClampDouble(mgd + GaussianSample() * maxGradientDiffSigma, maxGradientDiffBounds.min, maxGradientDiffBounds.max);
+                mingd = ClampDouble(mingd + GaussianSample() * minGradientDiffSigma, minGradientDiffBounds.min, minGradientDiffBounds.max);
 
-            return new Chromosome(ws, wsh, mll, sma, mgd);
+            return new Chromosome(ws, wsh, mll, sma, mingd);
         }
 
         // =================================================================

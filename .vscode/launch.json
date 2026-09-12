@@ -9,7 +9,7 @@
             "type": "dotnet",
             "request": "launch",
             "preLaunchTask": "build",
-            "projectPath": "${workspaceFolder}/ChartApp.csproj",
+            "projectPath": "${workspaceFolder}/ChartApp/ChartApp.csproj",
             "args": [],
             "cwd": "${workspaceFolder}",
             "stopAtEntry": false

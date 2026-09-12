@@ -1,0 +1,19 @@
+=== GA Evaluation Pass ===
+Pass Number:       2399
+Timestamp:         2026-09-10 10:37:46
+
+--- GA Parameters ---
+WindowSize:        157
+WindowShift:       45
+MinLineLength:     15
+SmaPeriod:         198
+MaxGradientDiff:   49.843551
+
+--- Constants ---
+Vicinity:          20
+MinTouchCount:     2
+
+--- Results ---
+Fitness (Return%): 10.4777
+Patterns Found:    23
+Total Return %:    10.4777

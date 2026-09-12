@@ -1,0 +1,19 @@
+=== GA Evaluation Pass ===
+Pass Number:       455
+Timestamp:         2026-09-09 23:04:44
+
+--- GA Parameters ---
+WindowSize:        241
+WindowShift:       1
+MinLineLength:     152
+SmaPeriod:         117
+MaxGradientDiff:   27.711150
+
+--- Constants ---
+Vicinity:          20
+MinTouchCount:     2
+
+--- Results ---
+Fitness (Return%): 6358.8112
+Patterns Found:    743
+Total Return %:    6358.8112

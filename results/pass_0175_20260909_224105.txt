@@ -1,0 +1,19 @@
+=== GA Evaluation Pass ===
+Pass Number:       175
+Timestamp:         2026-09-09 22:41:05
+
+--- GA Parameters ---
+WindowSize:        345
+WindowShift:       19
+MinLineLength:     28
+SmaPeriod:         70
+MaxGradientDiff:   35.513100
+
+--- Constants ---
+Vicinity:          20
+MinTouchCount:     2
+
+--- Results ---
+Fitness (Return%): 970.6307
+Patterns Found:    150
+Total Return %:    970.6307

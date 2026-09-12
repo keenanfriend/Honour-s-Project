@@ -1,0 +1,19 @@
+=== GA Evaluation Pass ===
+Pass Number:       411
+Timestamp:         2026-09-09 23:00:55
+
+--- GA Parameters ---
+WindowSize:        247
+WindowShift:       1
+MinLineLength:     115
+SmaPeriod:         83
+MaxGradientDiff:   43.088556
+
+--- Constants ---
+Vicinity:          20
+MinTouchCount:     2
+
+--- Results ---
+Fitness (Return%): 0.0000
+Patterns Found:    0
+Total Return %:    0.0000

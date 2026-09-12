@@ -1,0 +1,19 @@
+=== GA Evaluation Pass ===
+Pass Number:       1097
+Timestamp:         2026-09-12 18:27:19
+
+--- GA Parameters ---
+WindowSize:        406
+WindowShift:       25
+MinLineLength:     64
+SmaPeriod:         17
+MinGradientDiff:   1.462839
+
+--- Constants ---
+Vicinity:          20
+MinTouchCount:     2
+
+--- Results ---
+Fitness (Return%): 26.5090
+Patterns Found:    11
+Total Return %:    26.5090

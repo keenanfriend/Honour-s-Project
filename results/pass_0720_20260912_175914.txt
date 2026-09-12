@@ -1,0 +1,19 @@
+=== GA Evaluation Pass ===
+Pass Number:       720
+Timestamp:         2026-09-12 17:59:14
+
+--- GA Parameters ---
+WindowSize:        166
+WindowShift:       2
+MinLineLength:     42
+SmaPeriod:         7
+MaxGradientDiff:   18.867072
+
+--- Constants ---
+Vicinity:          20
+MinTouchCount:     2
+
+--- Results ---
+Fitness (Return%): 24.5943
+Patterns Found:    27
+Total Return %:    24.5943

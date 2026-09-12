@@ -1,0 +1,19 @@
+=== GA Evaluation Pass ===
+Pass Number:       379
+Timestamp:         2026-09-10 13:16:46
+
+--- GA Parameters ---
+WindowSize:        125
+WindowShift:       46
+MinLineLength:     24
+SmaPeriod:         37
+MaxGradientDiff:   22.165330
+
+--- Constants ---
+Vicinity:          20
+MinTouchCount:     2
+
+--- Results ---
+Fitness (Return%): 40.8942
+Patterns Found:    26
+Total Return %:    40.8942

@@ -1,0 +1,19 @@
+=== GA Evaluation Pass ===
+Pass Number:       736
+Timestamp:         2026-09-09 23:26:40
+
+--- GA Parameters ---
+WindowSize:        251
+WindowShift:       1
+MinLineLength:     98
+SmaPeriod:         85
+MaxGradientDiff:   32.301014
+
+--- Constants ---
+Vicinity:          20
+MinTouchCount:     2
+
+--- Results ---
+Fitness (Return%): 0.0000
+Patterns Found:    0
+Total Return %:    0.0000

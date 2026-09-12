@@ -25,7 +25,7 @@ namespace ChartApp
             sw.WriteLine($"WindowShift:       {c.WindowShift}");
             sw.WriteLine($"MinLineLength:     {c.MinLineLength}");
             sw.WriteLine($"SmaPeriod:         {c.SmaPeriod}");
-            sw.WriteLine($"MaxGradientDiff:   {c.MaxGradientDiff.ToString("F6", CultureInfo.InvariantCulture)}");
+            sw.WriteLine($"MinGradientDiff:   {c.MinGradientDiff.ToString("F6", CultureInfo.InvariantCulture)}");
             sw.WriteLine();
 
             sw.WriteLine("--- Constants ---");

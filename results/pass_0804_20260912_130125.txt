@@ -1,0 +1,19 @@
+=== GA Evaluation Pass ===
+Pass Number:       804
+Timestamp:         2026-09-12 13:01:25
+
+--- GA Parameters ---
+WindowSize:        161
+WindowShift:       28
+MinLineLength:     26
+SmaPeriod:         13
+MaxGradientDiff:   Infinity
+
+--- Constants ---
+Vicinity:          20
+MinTouchCount:     2
+
+--- Results ---
+Fitness (Return%): 69.7238
+Patterns Found:    30
+Total Return %:    69.7238

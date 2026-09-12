@@ -1,0 +1,19 @@
+=== GA Evaluation Pass ===
+Pass Number:       1230
+Timestamp:         2026-09-12 18:28:12
+
+--- GA Parameters ---
+WindowSize:        401
+WindowShift:       25
+MinLineLength:     51
+SmaPeriod:         24
+MinGradientDiff:   1.462839
+
+--- Constants ---
+Vicinity:          20
+MinTouchCount:     2
+
+--- Results ---
+Fitness (Return%): 57.0138
+Patterns Found:    14
+Total Return %:    57.0138

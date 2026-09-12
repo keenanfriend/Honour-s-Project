@@ -5,7 +5,7 @@ namespace ChartApp
     public class FitnessEval
     {
         private readonly List<Candle> candles;
-        private readonly Dictionary<string, double> dailySma;
+        private readonly DailyCloseSeries dailyCloseSeries;
 
         // Mutable state reset per evaluation
         private TrendLine? bestSupportLine = null;
@@ -18,10 +18,16 @@ namespace ChartApp
         // Minimum touches required for a valid trendline (adjust manually: 2 or 3)
         private const int MinTouchCount = 2;
 
-        public FitnessEval(List<Candle> candles, Dictionary<string, double> dailySma)
+        // When true, every detected pattern's realised gradient difference is
+        // recorded here alongside its trade outcome, to see what the natural
+        // distribution looks like -- see D-0024.
+        public bool LogPatterns { get; set; } = false;
+        public List<(double GradientDiff, double ReturnPerc, int Result)> PatternLog { get; } = new();
+
+        public FitnessEval(List<Candle> candles, DailyCloseSeries dailyCloseSeries)
         {
             this.candles = candles;
-            this.dailySma = dailySma;
+            this.dailyCloseSeries = dailyCloseSeries;
         }
 
         public EvalResult Evaluate(Chromosome c)
@@ -33,17 +39,10 @@ namespace ChartApp
         // SMA Lookup
         // =====================================================================
 
-        private double? GetSmaForCandle(Candle candle)
+        private bool? GetTradeDirection(int candleIndex, int smaPeriod)
         {
-            string date = candle.Date.Substring(0, 10);
-            if (dailySma.TryGetValue(date, out double sma))
-                return sma;
-            return null;
-        }
-
-        private bool? GetTradeDirection(int candleIndex)
-        {
-            double? sma = GetSmaForCandle(candles[candleIndex]);
+            string date = candles[candleIndex].Date.Substring(0, 10);
+            double? sma = dailyCloseSeries.Sma(date, smaPeriod);
             if (sma is null) return null;
             return candles[candleIndex].Close > sma.Value;
         }
@@ -57,7 +56,8 @@ namespace ChartApp
             int windowSize = c.WindowSize;
             int lineLen = c.MinLineLength;
             int windowShift = c.WindowShift;
-            double maxGradientDiff = c.MaxGradientDiff;
+            double minGradientDiff = c.MinGradientDiff;
+            int smaPeriod = c.SmaPeriod;
             int vicinity = Chromosome.Vicinity;
             int windowStart = 0;
 
@@ -68,8 +68,9 @@ namespace ChartApp
             {
                 int windowEnd = windowStart + windowSize;
 
-                // Determine trade direction from SMA at the window's last candle
-                bool? direction = GetTradeDirection(windowEnd - 1);
+                // Determine trade direction from this chromosome's own SmaPeriod-day
+                // rolling average at the window's last candle
+                bool? direction = GetTradeDirection(windowEnd - 1, smaPeriod);
                 if (direction is null)
                 {
                     windowStart += windowShift;
@@ -104,15 +105,16 @@ namespace ChartApp
 
                 double pricePerc;
                 int entryIndex;
+                double gradientDiff;
                 bool patternFound;
 
                 if (isLong)
                 {
-                    patternFound = FindLongPattern(windowStart, lineLen, windowEnd, vicinity, maxGradientDiff, out pricePerc, out entryIndex);
+                    patternFound = FindLongPattern(windowStart, lineLen, windowEnd, vicinity, minGradientDiff, out pricePerc, out entryIndex, out gradientDiff);
                 }
                 else
                 {
-                    patternFound = FindShortPattern(windowStart, lineLen, windowEnd, vicinity, maxGradientDiff, out pricePerc, out entryIndex);
+                    patternFound = FindShortPattern(windowStart, lineLen, windowEnd, vicinity, minGradientDiff, out pricePerc, out entryIndex, out gradientDiff);
                 }
 
                 if (!patternFound)
@@ -121,14 +123,35 @@ namespace ChartApp
                     continue;
                 }
 
-                // Accumulate rate of return
-                patternsFound++;
-                totalReturnPerc += pricePerc;
+                // A pattern was found: simulate the trade it implies instead of
+                // just summing the funnel width directly. Everything here stays
+                // a percentage of the entry price -- no position sizing or
+                // account-equity tracking, just win/loss/timeout against the
+                // pattern's own detected target and stop distance.
+                int patternLength = entryIndex - windowStart;
+                (int result, int resolvedIndex) = isLong
+                    ? EvaluateTradeLong(pricePerc, entryIndex, patternLength, Chromosome.SlRatio, Chromosome.MaxTradeLength)
+                    : EvaluateTradeShort(pricePerc, entryIndex, patternLength, Chromosome.SlRatio, Chromosome.MaxTradeLength);
 
-                windowStart += windowShift;
+                double tradeReturnPerc = result switch
+                {
+                    1 => pricePerc,                           // target hit: captured the full detected funnel width
+                    -1 => -(pricePerc * Chromosome.SlRatio),  // stop hit: lost the scaled-down risk distance
+                    _ => 0.0                                  // neither hit within MaxTradeLength candles
+                };
+
+                patternsFound++;
+                totalReturnPerc += tradeReturnPerc;
+
+                if (LogPatterns)
+                    PatternLog.Add((gradientDiff, tradeReturnPerc, result));
+
+                // Advance past the resolved trade instead of a fixed shift, so an
+                // overlapping window can no longer count the same trade twice.
+                windowStart = resolvedIndex + 1;
             }
 
-            // Fitness = total rate of return percentage
+            // Fitness = total rate of return percentage, from simulated trades
             double fitness = totalReturnPerc;
 
             return new EvalResult(fitness, patternsFound, totalReturnPerc);
@@ -138,10 +161,11 @@ namespace ChartApp
         // LONG Pattern Finding
         // =====================================================================
 
-        private bool FindLongPattern(int windowStart, int lineLen, int windowEnd, int vicinity, double maxGradientDiff, out double pricePerc, out int entryIndex)
+        private bool FindLongPattern(int windowStart, int lineLen, int windowEnd, int vicinity, double minGradientDiff, out double pricePerc, out int entryIndex, out double gradientDiff)
         {
             pricePerc = 0;
             entryIndex = 0;
+            gradientDiff = 0;
 
             FindLinesLong(windowStart, lineLen, windowEnd, vicinity);
 
@@ -165,9 +189,14 @@ namespace ChartApp
             if (resistanceGrad > supportGrad)
                 return false;
 
-            // Gradient difference filter: reject if lines diverge more than allowed
-            double gradientDiff = Math.Abs(resistanceGrad - supportGrad);
-            if (gradientDiff > maxGradientDiff)
+            // Gradient difference filter: reject if lines diverge less than
+            // required -- a near-parallel channel rather than a genuine wedge
+            // (D-0026; formerly a ceiling here, see D-0004/D-0023). The
+            // directional check above (resistanceGrad > supportGrad) still
+            // separately guarantees the lines converge or run parallel, never
+            // diverge outward -- untouched by this change.
+            gradientDiff = Math.Abs(resistanceGrad - supportGrad);
+            if (gradientDiff < minGradientDiff)
                 return false;
 
             pricePerc = (bestResistanceLine.Y1 - bestSupportLine.Y1) / bestSupportLine.Y1 * 100;
@@ -242,10 +271,11 @@ namespace ChartApp
         // SHORT Pattern Finding
         // =====================================================================
 
-        private bool FindShortPattern(int windowStart, int lineLen, int windowEnd, int vicinity, double maxGradientDiff, out double pricePerc, out int entryIndex)
+        private bool FindShortPattern(int windowStart, int lineLen, int windowEnd, int vicinity, double minGradientDiff, out double pricePerc, out int entryIndex, out double gradientDiff)
         {
             pricePerc = 0;
             entryIndex = 0;
+            gradientDiff = 0;
 
             FindLinesShort(windowStart, lineLen, windowEnd, vicinity);
 
@@ -269,9 +299,13 @@ namespace ChartApp
             if (supportGrad < resistanceGrad)
                 return false;
 
-            // Gradient difference filter: reject if lines diverge more than allowed
-            double gradientDiff = Math.Abs(supportGrad - resistanceGrad);
-            if (gradientDiff > maxGradientDiff)
+            // Gradient difference filter: reject if lines diverge less than
+            // required -- a near-parallel channel rather than a genuine wedge
+            // (D-0026; formerly a ceiling here, see D-0004/D-0023). The
+            // directional check above still separately guarantees the lines
+            // converge or run parallel, never diverge outward.
+            gradientDiff = Math.Abs(supportGrad - resistanceGrad);
+            if (gradientDiff < minGradientDiff)
                 return false;
 
             pricePerc = (bestResistanceLine.Y1 - bestSupportLine.Y1) / bestSupportLine.Y1 * 100;

@@ -7,7 +7,7 @@ namespace ChartApp
         public int WindowShift { get; }
         public int MinLineLength { get; }
         public int SmaPeriod { get; }
-        public double MaxGradientDiff { get; } // Max allowed abs difference in gradient between support & resistance
+        public double MinGradientDiff { get; } // Min required abs difference in gradient between support & resistance (D-0026: replaces the old MaxGradientDiff ceiling with an evolved floor)
 
         // ===== Constants (fixed during GA runs) =====
         public const int Vicinity = 20;
@@ -16,13 +16,13 @@ namespace ChartApp
         public const double MaxProfitPerc = 10.0;
 
         public Chromosome(int windowSize, int windowShift, int minLineLength,
-                          int smaPeriod, double maxGradientDiff)
+                          int smaPeriod, double minGradientDiff)
         {
             WindowSize = windowSize;
             WindowShift = windowShift;
             MinLineLength = minLineLength;
             SmaPeriod = smaPeriod;
-            MaxGradientDiff = maxGradientDiff;
+            MinGradientDiff = minGradientDiff;
         }
     }
 }

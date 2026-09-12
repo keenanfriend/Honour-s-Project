@@ -1,0 +1,19 @@
+=== GA Evaluation Pass ===
+Pass Number:       954
+Timestamp:         2026-09-12 13:01:32
+
+--- GA Parameters ---
+WindowSize:        177
+WindowShift:       24
+MinLineLength:     26
+SmaPeriod:         26
+MaxGradientDiff:   Infinity
+
+--- Constants ---
+Vicinity:          20
+MinTouchCount:     2
+
+--- Results ---
+Fitness (Return%): 25.1067
+Patterns Found:    26
+Total Return %:    25.1067

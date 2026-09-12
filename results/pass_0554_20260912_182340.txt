@@ -1,0 +1,19 @@
+=== GA Evaluation Pass ===
+Pass Number:       554
+Timestamp:         2026-09-12 18:23:40
+
+--- GA Parameters ---
+WindowSize:        394
+WindowShift:       29
+MinLineLength:     68
+SmaPeriod:         20
+MinGradientDiff:   5.004376
+
+--- Constants ---
+Vicinity:          20
+MinTouchCount:     2
+
+--- Results ---
+Fitness (Return%): 12.3272
+Patterns Found:    5
+Total Return %:    12.3272

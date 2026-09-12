@@ -1,0 +1,19 @@
+=== GA Evaluation Pass ===
+Pass Number:       828
+Timestamp:         2026-09-10 13:17:02
+
+--- GA Parameters ---
+WindowSize:        138
+WindowShift:       33
+MinLineLength:     25
+SmaPeriod:         5
+MaxGradientDiff:   46.059990
+
+--- Constants ---
+Vicinity:          20
+MinTouchCount:     2
+
+--- Results ---
+Fitness (Return%): 80.5667
+Patterns Found:    31
+Total Return %:    80.5667

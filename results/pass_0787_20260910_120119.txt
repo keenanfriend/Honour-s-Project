@@ -1,0 +1,19 @@
+=== GA Evaluation Pass ===
+Pass Number:       787
+Timestamp:         2026-09-10 12:01:19
+
+--- GA Parameters ---
+WindowSize:        373
+WindowShift:       50
+MinLineLength:     74
+SmaPeriod:         19
+MaxGradientDiff:   42.426735
+
+--- Constants ---
+Vicinity:          20
+MinTouchCount:     2
+
+--- Results ---
+Fitness (Return%): 4.3452
+Patterns Found:    14
+Total Return %:    4.3452

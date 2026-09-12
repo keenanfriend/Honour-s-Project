@@ -1,0 +1,19 @@
+=== GA Evaluation Pass ===
+Pass Number:       2570
+Timestamp:         2026-09-10 10:37:54
+
+--- GA Parameters ---
+WindowSize:        148
+WindowShift:       45
+MinLineLength:     23
+SmaPeriod:         103
+MaxGradientDiff:   43.446204
+
+--- Constants ---
+Vicinity:          20
+MinTouchCount:     2
+
+--- Results ---
+Fitness (Return%): 57.2130
+Patterns Found:    24
+Total Return %:    57.2130

@@ -1,0 +1,19 @@
+=== GA Evaluation Pass ===
+Pass Number:       214
+Timestamp:         2026-09-12 13:00:58
+
+--- GA Parameters ---
+WindowSize:        400
+WindowShift:       15
+MinLineLength:     44
+SmaPeriod:         10
+MaxGradientDiff:   Infinity
+
+--- Constants ---
+Vicinity:          20
+MinTouchCount:     2
+
+--- Results ---
+Fitness (Return%): 30.3204
+Patterns Found:    15
+Total Return %:    30.3204

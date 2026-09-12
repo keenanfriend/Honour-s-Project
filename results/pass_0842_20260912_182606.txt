@@ -1,0 +1,19 @@
+=== GA Evaluation Pass ===
+Pass Number:       842
+Timestamp:         2026-09-12 18:26:06
+
+--- GA Parameters ---
+WindowSize:        400
+WindowShift:       25
+MinLineLength:     50
+SmaPeriod:         22
+MinGradientDiff:   1.539906
+
+--- Constants ---
+Vicinity:          20
+MinTouchCount:     2
+
+--- Results ---
+Fitness (Return%): 67.3677
+Patterns Found:    14
+Total Return %:    67.3677

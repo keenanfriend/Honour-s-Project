@@ -1,0 +1,19 @@
+=== GA Evaluation Pass ===
+Pass Number:       296
+Timestamp:         2026-09-10 13:16:41
+
+--- GA Parameters ---
+WindowSize:        287
+WindowShift:       46
+MinLineLength:     26
+SmaPeriod:         89
+MaxGradientDiff:   26.600331
+
+--- Constants ---
+Vicinity:          20
+MinTouchCount:     2
+
+--- Results ---
+Fitness (Return%): 26.7053
+Patterns Found:    9
+Total Return %:    26.7053

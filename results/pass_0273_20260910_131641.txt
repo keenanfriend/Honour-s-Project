@@ -1,0 +1,19 @@
+=== GA Evaluation Pass ===
+Pass Number:       273
+Timestamp:         2026-09-10 13:16:41
+
+--- GA Parameters ---
+WindowSize:        125
+WindowShift:       18
+MinLineLength:     24
+SmaPeriod:         29
+MaxGradientDiff:   7.825747
+
+--- Constants ---
+Vicinity:          20
+MinTouchCount:     2
+
+--- Results ---
+Fitness (Return%): 16.4567
+Patterns Found:    25
+Total Return %:    16.4567

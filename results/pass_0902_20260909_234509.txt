@@ -1,0 +1,19 @@
+=== GA Evaluation Pass ===
+Pass Number:       902
+Timestamp:         2026-09-09 23:45:09
+
+--- GA Parameters ---
+WindowSize:        256
+WindowShift:       1
+MinLineLength:     79
+SmaPeriod:         89
+MaxGradientDiff:   37.118116
+
+--- Constants ---
+Vicinity:          20
+MinTouchCount:     2
+
+--- Results ---
+Fitness (Return%): 0.0000
+Patterns Found:    0
+Total Return %:    0.0000

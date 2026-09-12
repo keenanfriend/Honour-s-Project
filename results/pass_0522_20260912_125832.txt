@@ -1,0 +1,19 @@
+=== GA Evaluation Pass ===
+Pass Number:       522
+Timestamp:         2026-09-12 12:58:32
+
+--- GA Parameters ---
+WindowSize:        101
+WindowShift:       41
+MinLineLength:     10
+SmaPeriod:         5
+MaxGradientDiff:   50.000000
+
+--- Constants ---
+Vicinity:          20
+MinTouchCount:     2
+
+--- Results ---
+Fitness (Return%): 16.3531
+Patterns Found:    41
+Total Return %:    16.3531

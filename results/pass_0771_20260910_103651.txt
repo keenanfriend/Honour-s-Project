@@ -1,0 +1,19 @@
+=== GA Evaluation Pass ===
+Pass Number:       771
+Timestamp:         2026-09-10 10:36:51
+
+--- GA Parameters ---
+WindowSize:        111
+WindowShift:       38
+MinLineLength:     24
+SmaPeriod:         132
+MaxGradientDiff:   45.324922
+
+--- Constants ---
+Vicinity:          20
+MinTouchCount:     2
+
+--- Results ---
+Fitness (Return%): 50.2706
+Patterns Found:    28
+Total Return %:    50.2706

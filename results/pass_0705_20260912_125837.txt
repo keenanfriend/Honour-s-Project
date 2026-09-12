@@ -1,0 +1,19 @@
+=== GA Evaluation Pass ===
+Pass Number:       705
+Timestamp:         2026-09-12 12:58:37
+
+--- GA Parameters ---
+WindowSize:        117
+WindowShift:       4
+MinLineLength:     21
+SmaPeriod:         7
+MaxGradientDiff:   50.000000
+
+--- Constants ---
+Vicinity:          20
+MinTouchCount:     2
+
+--- Results ---
+Fitness (Return%): 54.1262
+Patterns Found:    47
+Total Return %:    54.1262
